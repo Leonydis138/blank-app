@@ -56,5 +56,5 @@ if st.button("Self-Correct"):
 
 st.markdown(f"**🛠️ Status:** `{st.session_state['status']}`")
 st.subheader("📜 System Logs")
-st.text_area("Log Output", "
-".join(st.session_state['logs']), height=300)
+st.text_area("Log Output",
+"\n".join(st.session_state['logs']), height=300)
