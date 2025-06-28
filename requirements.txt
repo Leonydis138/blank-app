@@ -6,3 +6,10 @@ langchain
 openai
 plotly
 websockets
+transformers
+json
+pipeline
+random
+threading
+time
+queue
