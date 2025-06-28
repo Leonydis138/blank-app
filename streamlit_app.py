@@ -45,7 +45,7 @@ if st.button('Self-Teach'):
 if st.button('Self-Correct'):
     result = correction.self_correct()
     st.write('Correction Result:', result)
- = learning.self_learn()
+    learning.self_learn()
     st.write('Learning Result:', result)
 
 if st.button('Self-Correct'):
