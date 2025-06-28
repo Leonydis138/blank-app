@@ -3,15 +3,17 @@ import threading
 import time
 import requests
 
-BACKEND_URL = "http://backend:8000"
 
+# Safe initialization
 if 'logs' not in st.session_state:
     st.session_state['logs'] = []
 if 'status' not in st.session_state:
     st.session_state['status'] = 'Idle'
-
+    
 def log(msg):
     st.session_state['logs'].append(f"{time.strftime('%H:%M:%S')} | {msg}")
+
+BACKEND_URL = "http://backend:8000"
 
 def run_diagnostics():
     st.session_state['status'] = 'Running Diagnostics...'
