@@ -16,15 +16,15 @@ if 'status' not in st.session_state:
 st.write("System Status:", st.session_state['status'])
 
 # Buttons for control
-if st.button('Run Diagnostics'):
+if st.button('Run Diagnostics1'):
     st.session_state['status'] = 'Running Diagnostics...'
     # Call diagnostics function here
 
-if st.button('Self-Teach'):
+if st.button('Self-Teach1'):
     st.session_state['status'] = 'Learning...'
     # Call learning function here
 
-if st.button('Self-Correct'):
+if st.button('Self-Correct1'):
     st.session_state['status'] = 'Correcting Errors...'
     # Call correction function here
 
