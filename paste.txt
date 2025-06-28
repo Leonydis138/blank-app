@@ -1,0 +1,91 @@
+import numpy as np
+from moviepy.editor import *
+from PIL import Image, ImageDraw, ImageFont
+import os
+
+# Function to create an image with text using Pillow
+
+def create_text_image(text, size=(1080, 1920), fontsize=60, text_color=(255, 255, 255), bg_color=(0, 0, 0)):
+    img = Image.new('RGB', size, color=bg_color)
+    draw = ImageDraw.Draw(img)
+    try:
+        # Try to use a common truetype font
+        font = ImageFont.truetype('DejaVuSans-Bold.ttf', fontsize)
+    except Exception as e:
+        font = ImageFont.load_default()
+    # Calculate text size and position
+    text_width, text_height = draw.multiline_textsize(text, font=font)
+    position = ((size[0]-text_width)//2, (size[1]-text_height)//2)
+    draw.multiline_text(position, text, fill=text_color, font=font, align='center')
+    return np.array(img)
+
+# Create a function to return an ImageClip from text
+
+def create_text_clip(text, duration, fontsize=60, text_color=(255, 255, 255), bg_color=(0, 0, 0)):
+    img_array = create_text_image(text, fontsize=fontsize, text_color=text_color, bg_color=bg_color)
+    clip = ImageClip(img_array).set_duration(duration)
+    return clip
+
+# Function to create a gradient background clip
+
+def create_gradient_background(size, duration):
+    w, h = size
+    gradient = np.zeros((h, w, 3), dtype=np.uint8)
+    for i in range(h):
+        gradient[i, :] = [0, 0, int(255 * i / h)]  # dark blue gradient
+    clip = ImageClip(gradient).set_duration(duration)
+    return clip
+
+# Create scenes
+
+def create_hook_scene():
+    return create_text_clip("Drowning in Debt?", 2, fontsize=80, text_color=(255,255,255), bg_color=(0,0,0))
+
+
+def create_problem_scene():
+    return create_text_clip("Stop struggling with\
+endless payments", 2, fontsize=60, text_color=(255,255,255), bg_color=(0,0,0))
+
+
+def create_solution_scene():
+    return create_text_clip("You might qualify for\
+Debt Write-Off", 2, fontsize=60, text_color=(255,255,255), bg_color=(0,0,0))
+
+
+def create_cta_scene():
+    # Use a different text color for CTA
+    return create_text_clip("Swipe Up Now\
+to Check if You Qualify", 2, fontsize=50, text_color=(255, 255, 0), bg_color=(0,0,0))
+
+# Video parameters
+w, h = 1080, 1920  # dimensions
+total_duration = 8  # total video duration
+
+# Create background clip
+background = create_gradient_background((w, h), total_duration)
+
+# Create text scenes
+hook = create_hook_scene()
+problem = create_problem_scene()
+solution = create_solution_scene()
+cta = create_cta_scene()
+
+# Compose the video by overlaying text clips on background
+video = CompositeVideoClip([
+    background,
+    hook.set_start(0),
+    problem.set_start(2),
+    solution.set_start(4),
+    cta.set_start(6)
+], size=(w, h))
+
+# Optionally add background music if available
+music_path = "path_to_music.mp3"
+if os.path.exists(music_path):
+    audio = AudioFileClip(music_path).set_duration(total_duration)
+    video = video.set_audio(audio)
+
+# Write the final video file
+video.write_videofile("debt_relief_ad.mp4", fps=30, codec='libx264', audio_codec='aac')
+
+print("Video creation complete: debt_relief_ad.mp4")

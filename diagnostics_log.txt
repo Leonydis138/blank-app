@@ -1,0 +1,4 @@
+INFO:root:CPU load: 28.511319615629617
+INFO:root:Memory usage: 0.06469296813120806
+INFO:root:Disk space: 0.6613237132757743
+INFO:root:Network connectivity: False
