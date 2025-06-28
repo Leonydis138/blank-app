@@ -1,4 +1,4 @@
-ustreamlit
+streamlit
 requests
 fastapi
 uvicorn
