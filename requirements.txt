@@ -12,3 +12,4 @@ pipeline
 torch
 gradio
 huggingface_hub
+pandas
