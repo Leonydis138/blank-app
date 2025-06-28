@@ -5,14 +5,9 @@ import time
 import requests
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Autonomous AI Dashboard", layout="wide")
+st.set_page_config(page_title="ROL-M OCR Dashboard", layout="wide")
 BACKEND_URL = "http://backend:8000"
-
-MODEL_OPTIONS = {
-    "DeepSeek-V3-0324": "deepseek-ai/DeepSeek-V3-0324",
-    "Mistral 7B Instruct": "mistralai/Mistral-7B-Instruct-v0.2",
-    "Gemma 7B It": "google/gemma-7b-it"
-}
+MODEL_ID = "accounts/fireworks/models/rolm-ocr"
 
 # ─── SESSION STATE INIT ───────────────────────────────────────────────────────
 st.session_state.setdefault('logs', [])
@@ -66,12 +61,12 @@ def self_correct():
     st.session_state['status'] = 'Correction Completed'
 
 # ─── INFERENCE (Streaming Support) ─────────────────────────────────────────────
-def run_inference_stream(prompt, token, model_id, temperature, max_tokens, top_p, rep_penalty):
+def run_inference_stream(prompt, token, temperature, max_tokens, top_p, rep_penalty):
     if not token:
         yield "❌ Error: No API token provided."
         return
 
-    url = f"https://api.fireworks.ai/inference/v1/models/{model_id}/stream"
+    url = f"https://api.fireworks.ai/inference/v1/models/{MODEL_ID}/stream"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     payload = {
         "inputs": prompt,
@@ -102,7 +97,7 @@ def run_inference_stream(prompt, token, model_id, temperature, max_tokens, top_p
 
 # ─── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.header("🎯 Inference Settings")
+    st.header("🧠 ROLM OCR Inference")
 
     token_input = st.text_input("Fireworks API Token", type="password", value=st.session_state.get('token', ''))
     st.session_state['save_token'] = st.checkbox("Remember token?", value=st.session_state['save_token'])
@@ -110,33 +105,29 @@ with st.sidebar:
         st.session_state['token'] = token_input
     token_to_use = token_input or st.session_state['token']
 
-    model_id = st.selectbox("🧠 Model", list(MODEL_OPTIONS.keys()))
-    prompt = st.text_area("📝 Prompt", height=150, placeholder="Ask me anything...")
+    prompt = st.text_area("📝 OCR Prompt (describe image or paste raw text)", height=150)
 
     temperature = st.slider("🔥 Temperature", 0.0, 1.5, 0.7)
     max_tokens = st.slider("📏 Max Tokens", 32, 2048, 512)
     top_p = st.slider("📊 Top-p", 0.0, 1.0, 0.9)
     rep_penalty = st.slider("🌀 Repetition Penalty", 0.5, 2.0, 1.0)
 
-    if st.button("🚀 Generate"):
+    if st.button("🚀 Run Inference"):
         with st.spinner("Generating..."):
             placeholder = st.empty()
             output = ""
             for chunk in run_inference_stream(
-                prompt, token_to_use, MODEL_OPTIONS[model_id],
-                temperature, max_tokens, top_p, rep_penalty
+                prompt, token_to_use, temperature, max_tokens, top_p, rep_penalty
             ):
                 output = chunk
                 placeholder.markdown(f"```\n{output}\n```")
             append_history(prompt, output)
             st.session_state['inference_output'] = output
 
-    # Optional: File Upload
-    uploaded_file = st.file_uploader("📁 Upload file (txt/pdf/png/jpg)", type=["txt", "pdf", "png", "jpg"])
+    uploaded_file = st.file_uploader("📁 Upload image/text/PDF for OCR", type=["txt", "pdf", "png", "jpg"])
     if uploaded_file:
         st.write("Uploaded file:", uploaded_file.name)
 
-    # History + Export Logs
     if st.checkbox("🕘 Show Prompt History"):
         for entry in st.session_state['history']:
             st.write("**Prompt:**", entry['prompt'])
@@ -151,7 +142,7 @@ with st.sidebar:
     )
 
 # ─── MAIN PANEL ────────────────────────────────────────────────────────────────
-st.title("🤖 Autonomous AI Multi-Agent Dashboard")
+st.title("🤖 ROLM-OCR: Autonomous AI Dashboard")
 
 col1, col2, col3 = st.columns(3)
 with col1:
