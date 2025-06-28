@@ -2,7 +2,16 @@ import streamlit as st
 import threading
 import time
 import requests
+import gradio as gr
 
+with gr.Blocks(fill_height=True) as demo:
+    with gr.Sidebar():
+        gr.Markdown("# Inference Provider")
+        gr.Markdown("This Space showcases the deepseek-ai/DeepSeek-V3-0324 model, served by the fireworks-ai API. Sign in with your Hugging Face account to use this API.")
+        button = gr.LoginButton("Sign in")
+    gr.load("models/deepseek-ai/DeepSeek-V3-0324", accept_token=button, provider="fireworks-ai")
+    
+demo.launch()
 BACKEND_URL = "http://backend:8000"
 
 # Ensure session state variables are initialized
