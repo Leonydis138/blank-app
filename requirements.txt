@@ -9,3 +9,4 @@ websockets
 transformers
 pipeline
 torch
+gradio
