@@ -39,7 +39,7 @@ if st.button('Run Diagnostics'):
     st.write('Diagnostics Result:', result)
 
 if st.button('Self-Teach'):
-    resultimport streamlit as st
+    result import streamlit as st
 
 st.title("🎈 My new app")
 st.write(
