@@ -1,165 +1,64 @@
 
 import streamlit as st
+import gradio as gr
 import threading
 import time
-import requests
+from huggingface_hub import InferenceClient
 
-# ─── CONFIG ───────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="ROL-M OCR Dashboard", layout="wide")
-BACKEND_URL = "http://backend:8000"
-MODEL_ID = "accounts/fireworks/models/rolm-ocr"
+# ─── SETUP INFERENCE CLIENT ─────────────────────────────────────────────
+client = InferenceClient("HuggingFaceH4/zephyr-7b-beta")
 
-# ─── SESSION STATE INIT ───────────────────────────────────────────────────────
-st.session_state.setdefault('logs', [])
-st.session_state.setdefault('status', 'Idle')
-st.session_state.setdefault('inference_output', '')
-st.session_state.setdefault('token', '')
-st.session_state.setdefault('save_token', False)
-st.session_state.setdefault('history', [])
+# ─── DEFINE CHAT RESPONSE FUNCTION ──────────────────────────────────────
+def respond(message, history: list[tuple[str, str]], system_message, max_tokens, temperature, top_p):
+    messages = [{"role": "system", "content": system_message}]
+    for user, assistant in history:
+        if user:
+            messages.append({"role": "user", "content": user})
+        if assistant:
+            messages.append({"role": "assistant", "content": assistant})
+    messages.append({"role": "user", "content": message})
 
-def log(msg):
-    timestamp = time.strftime('%H:%M:%S')
-    st.session_state['logs'].append(f"{timestamp} | {msg}")
+    response = ""
+    for msg in client.chat_completion(
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        stream=True,
+    ):
+        token = msg.choices[0].delta.content
+        response += token
+        yield response
 
-def append_history(prompt, output):
-    st.session_state['history'].append({"prompt": prompt, "output": output})
+# ─── STREAMLIT APP ──────────────────────────────────────────────────────
+st.set_page_config(page_title="Zephyr ChatBot", layout="wide")
+st.title("💬 Zephyr Chat Interface in Streamlit")
 
-def download_logs():
-    return "\n".join(st.session_state['logs'])
+# Info box
+with st.expander("ℹ️ About this Demo"):
+    st.markdown("""
+    This app uses **Gradio + Hugging Face Hub** to stream responses from the `HuggingFaceH4/zephyr-7b-beta` chat model via the `huggingface_hub.InferenceClient`.
 
-# ─── AGENT FUNCTIONS ───────────────────────────────────────────────────────────
-def run_diagnostics():
-    st.session_state['status'] = 'Running Diagnostics...'
-    log("Started diagnostics task")
-    try:
-        r = requests.post(f"{BACKEND_URL}/diagnostics")
-        log(f"Diagnostics: {r.json().get('message', 'No message')}")
-    except Exception as e:
-        log(f"Diagnostics Error: {e}")
-    st.session_state['status'] = 'Diagnostics Completed'
+    - Streaming chat interface
+    - Custom system prompt + parameters
+    """)
 
-def self_teach():
-    st.session_state['status'] = 'Learning...'
-    log("Started learning task")
-    try:
-        r = requests.post(f"{BACKEND_URL}/learn")
-        for i in r.json().get("insights", []):
-            log(f"Learned: {i}")
-    except Exception as e:
-        log(f"Learning Error: {e}")
-    st.session_state['status'] = 'Learning Completed'
+# Container for Gradio ChatInterface
+gr_container = st.container()
 
-def self_correct():
-    st.session_state['status'] = 'Correcting Errors...'
-    log("Started correction task")
-    try:
-        r = requests.post(f"{BACKEND_URL}/correct")
-        for fix in r.json().get("corrections", []):
-            log(f"Fixed: {fix}")
-    except Exception as e:
-        log(f"Correction Error: {e}")
-    st.session_state['status'] = 'Correction Completed'
+with gr_container:
+    # Only run Gradio block when this app is executed directly or inside Streamlit
+    with st.spinner("Launching chat interface..."):
+        demo = gr.ChatInterface(
+            fn=respond,
+            additional_inputs=[
+                gr.Textbox(value="You are a friendly chatbot.", label="System message"),
+                gr.Slider(minimum=1, maximum=2048, value=512, step=1, label="Max new tokens"),
+                gr.Slider(minimum=0.1, maximum=4.0, value=0.7, step=0.1, label="Temperature"),
+                gr.Slider(minimum=0.1, maximum=1.0, value=0.95, step=0.05, label="Top-p (nucleus sampling)"),
+            ],
+            title="Chat with Zephyr 7B",
+            description="Streamed response using Hugging Face Hub",
+        )
 
-# ─── INFERENCE (Streaming Support) ─────────────────────────────────────────────
-def run_inference_stream(prompt, token, temperature, max_tokens, top_p, rep_penalty):
-    if not token:
-        yield "❌ Error: No API token provided."
-        return
-
-    url = f"https://api.fireworks.ai/inference/v1/models/{MODEL_ID}/stream"
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "temperature": temperature,
-            "max_new_tokens": max_tokens,
-            "top_p": top_p,
-            "repetition_penalty": rep_penalty,
-            "do_sample": True
-        }
-    }
-
-    try:
-        with requests.post(url, headers=headers, json=payload, stream=True, timeout=60) as r:
-            r.raise_for_status()
-            buffer = ""
-            for line in r.iter_lines():
-                if line:
-                    try:
-                        chunk = line.decode().split("data:")[-1].strip()
-                        text = eval(chunk).get("generated_text", "")
-                        buffer += text
-                        yield buffer
-                    except Exception:
-                        continue
-    except Exception as e:
-        yield f"Inference error: {e}"
-
-# ─── SIDEBAR ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.header("🧠 ROLM OCR Inference")
-
-    token_input = st.text_input("Fireworks API Token", type="password", value=st.session_state.get('token', ''))
-    st.session_state['save_token'] = st.checkbox("Remember token?", value=st.session_state['save_token'])
-    if st.session_state['save_token']:
-        st.session_state['token'] = token_input
-    token_to_use = token_input or st.session_state['token']
-
-    prompt = st.text_area("📝 OCR Prompt (describe image or paste raw text)", height=150)
-
-    temperature = st.slider("🔥 Temperature", 0.0, 1.5, 0.7)
-    max_tokens = st.slider("📏 Max Tokens", 32, 2048, 512)
-    top_p = st.slider("📊 Top-p", 0.0, 1.0, 0.9)
-    rep_penalty = st.slider("🌀 Repetition Penalty", 0.5, 2.0, 1.0)
-
-    if st.button("🚀 Run Inference"):
-        with st.spinner("Generating..."):
-            placeholder = st.empty()
-            output = ""
-            for chunk in run_inference_stream(
-                prompt, token_to_use, temperature, max_tokens, top_p, rep_penalty
-            ):
-                output = chunk
-                placeholder.markdown(f"```\n{output}\n```")
-            append_history(prompt, output)
-            st.session_state['inference_output'] = output
-
-    uploaded_file = st.file_uploader("📁 Upload image/text/PDF for OCR", type=["txt", "pdf", "png", "jpg"])
-    if uploaded_file:
-        st.write("Uploaded file:", uploaded_file.name)
-
-    if st.checkbox("🕘 Show Prompt History"):
-        for entry in st.session_state['history']:
-            st.write("**Prompt:**", entry['prompt'])
-            st.write("**Output:**", entry['output'])
-            st.markdown("---")
-
-    st.download_button(
-        label="📥 Download Logs",
-        data=download_logs(),
-        file_name="logs.txt",
-        mime="text/plain"
-    )
-
-# ─── MAIN PANEL ────────────────────────────────────────────────────────────────
-st.title("🤖 ROLM-OCR: Autonomous AI Dashboard")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    if st.button("🧪 Run Diagnostics"):
-        threading.Thread(target=run_diagnostics, daemon=True).start()
-with col2:
-    if st.button("📚 Self-Teach"):
-        threading.Thread(target=self_teach, daemon=True).start()
-with col3:
-    if st.button("🛠️ Self-Correct"):
-        threading.Thread(target=self_correct, daemon=True).start()
-
-st.markdown(f"**🛠️ Current Status:** `{st.session_state['status']}`")
-
-st.subheader("📜 Logs")
-st.text_area("Log Output", "\n".join(st.session_state['logs']), height=300)
-
-if st.button("🧹 Clear Logs"):
-    st.session_state['logs'] = []
-    log("Logs cleared")
+        demo.launch(inline=True, share=False)  # inline=True allows embedding inside Streamlit
