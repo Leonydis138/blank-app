@@ -8,3 +8,4 @@ plotly
 websockets
 transformers
 pipeline
+torch
