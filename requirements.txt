@@ -8,7 +8,3 @@ plotly
 websockets
 transformers
 pipeline
-random
-threading
-pip
-queue
