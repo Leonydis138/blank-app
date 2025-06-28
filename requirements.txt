@@ -1,3 +1,8 @@
-gradio
-requests
 streamlit
+requests
+fastapi
+uvicorn
+langchain
+openai
+plotly
+websockets
