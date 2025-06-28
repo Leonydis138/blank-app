@@ -1,64 +1,122 @@
 
 import streamlit as st
-import gradio as gr
-import threading
-import time
-from huggingface_hub import InferenceClient
+import os
+import json
+import logging
+from transformers import pipeline
+import pandas as pd
+from hashlib import sha256
 
-# ─── SETUP INFERENCE CLIENT ─────────────────────────────────────────────
-client = InferenceClient("HuggingFaceH4/zephyr-7b-beta")
+# Set up logging
+logging.basicConfig(filename='app.log', level=logging.INFO)
 
-# ─── DEFINE CHAT RESPONSE FUNCTION ──────────────────────────────────────
-def respond(message, history: list[tuple[str, str]], system_message, max_tokens, temperature, top_p):
-    messages = [{"role": "system", "content": system_message}]
-    for user, assistant in history:
-        if user:
-            messages.append({"role": "user", "content": user})
-        if assistant:
-            messages.append({"role": "assistant", "content": assistant})
-    messages.append({"role": "user", "content": message})
+# Initialize the NLP model
+nlp = pipeline("text-generation", model="gpt2")
 
-    response = ""
-    for msg in client.chat_completion(
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        top_p=top_p,
-        stream=True,
-    ):
-        token = msg.choices[0].delta.content
-        response += token
-        yield response
+def load_json_data(file_name):
+    if os.path.exists(file_name):
+        with open(file_name, "r") as f:
+            return json.load(f)
+    return {}
 
-# ─── STREAMLIT APP ──────────────────────────────────────────────────────
-st.set_page_config(page_title="Zephyr ChatBot", layout="wide")
-st.title("💬 Zephyr Chat Interface in Streamlit")
+def save_json_data(file_name, data):
+    with open(file_name, "w") as f:
+        json.dump(data, f)
 
-# Info box
-with st.expander("ℹ️ About this Demo"):
-    st.markdown("""
-    This app uses **Gradio + Hugging Face Hub** to stream responses from the `HuggingFaceH4/zephyr-7b-beta` chat model via the `huggingface_hub.InferenceClient`.
+# Load user data
+user_data = load_json_data("user_data.json")
+user_responses = {}
+user_feedback = {}
+history = []
 
-    - Streaming chat interface
-    - Custom system prompt + parameters
-    """)
+# Function to create a hashed password
+def hash_password(password):
+    return sha256(password.encode()).hexdigest()
 
-# Container for Gradio ChatInterface
-gr_container = st.container()
+# User Authentication
+def login(username, password):
+    if username in user_data and user_data[username]['password'] == hash_password(password):
+        return True
+    return False
 
-with gr_container:
-    # Only run Gradio block when this app is executed directly or inside Streamlit
-    with st.spinner("Launching chat interface..."):
-        demo = gr.ChatInterface(
-            fn=respond,
-            additional_inputs=[
-                gr.Textbox(value="You are a friendly chatbot.", label="System message"),
-                gr.Slider(minimum=1, maximum=2048, value=512, step=1, label="Max new tokens"),
-                gr.Slider(minimum=0.1, maximum=4.0, value=0.7, step=0.1, label="Temperature"),
-                gr.Slider(minimum=0.1, maximum=1.0, value=0.95, step=0.05, label="Top-p (nucleus sampling)"),
-            ],
-            title="Chat with Zephyr 7B",
-            description="Streamed response using Hugging Face Hub",
-        )
+def register(username, password):
+    if username not in user_data:
+        user_data[username] = {'password': hash_password(password), 'responses': {}, 'feedback': {}}
+        save_json_data("user_data.json", user_data)
+        return True
+    return False
 
-        demo.launch(inline=True, share=False)  # inline=True allows embedding inside Streamlit
+def main():
+    st.title("Better AI Version with User Authentication")
+
+    menu = ["Login", "Register"]
+    choice = st.sidebar.selectbox("Select Action", menu)
+
+    if choice == "Login":
+        st.subheader("Login Section")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type='password')
+
+        if st.button("Login"):
+            if login(username, password):
+                st.success(f"Welcome *{username}*!")
+                user_responses = user_data[username]['responses']
+                user_feedback = user_data[username]['feedback']
+                global history
+                history = load_json_data(username + "_history.json")
+            else:
+                st.error("Invalid username or password")
+
+    if choice == "Register":
+        st.subheader("Register Section")
+        username = st.text_input("Choose a Username")
+        password = st.text_input("Choose a Password", type='password')
+
+        if st.button("Register"):
+            if register(username, password):
+                st.success("Registration successful! Please log in.")
+            else:
+                st.error("Username already exists.")
+
+    # Once user is logged in, show interaction section
+    if "Welcome" in st.session_state:
+        st.header("AI Interaction")
+        user_input = st.text_input("Ask me anything:")
+
+        if st.button("Submit"):
+            responses = ai_interaction(user_input)
+            for response in responses:
+                st.write(f"AI: {response}")
+            save_interaction(user_input, responses)
+
+            # Collect user feedback
+            feedback = st.radio("Was any of these responses helpful?", ("Yes", "No", "Neutral"), key="feedback")
+            if st.button("Submit Feedback"):
+                save_user_feedback(user_input, feedback)
+                user_feedback[user_input] = feedback
+                save_json_data("user_data.json", user_data)
+                st.success("Feedback submitted!")
+
+        # Display Interaction History
+        st.subheader("Interaction History")
+        for entry in history:
+            st.write(f"**You:** {entry['input']}")
+            st.write(f"**AI:** {entry['response']}")
+
+        # User-Defined Responses
+        st.header("Define Your Own Responses")
+        keyword = st.text_input("Keyword:")
+        user_response = st.text_area("Response:")
+
+        if st.button("Save Response"):
+            user_responses[keyword.lower()] = user_response
+            user_data[username]['responses'] = user_responses
+            save_json_data("user_data.json", user_data)
+            st.success(f"Response saved for: {keyword}")
+
+        # Data Export Section
+        st.header("Export Data")
+        export_data()
+
+if __name__ == "__main__":
+    main()
