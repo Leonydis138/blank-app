@@ -1,4 +1,7 @@
-
+gradio
+faiss-cpu
+numpy
+tiktoken
 streamlit
 requests
 fastapi
@@ -10,6 +13,5 @@ websockets
 transformers
 pipeline
 torch
-gradio
 huggingface_hub
 pandas
