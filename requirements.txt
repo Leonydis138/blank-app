@@ -3,4 +3,3 @@ openai
 faiss-cpu
 numpy
 tiktoken
-openai.embeddings_utils
