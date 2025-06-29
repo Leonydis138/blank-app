@@ -1,19 +1,10 @@
-# 🎈 Blank app template
+# Tri-Agent Conversational AI
 
-A simple Streamlit app template for you to modify!
+This Gradio app hosts three AI agents: two chatting agents (A & B) and an Overseer that listens, learns, and can intervene.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://blank-app-template.streamlit.app/)
+## Deployment on Hugging Face Spaces
 
-### How to run it on your own machine
-
-1. Install the requirements
-
-   ```
-   $ pip install -r requirements.txt
-   ```
-
-2. Run the app
-
-   ```
-   $ streamlit run streamlit_app.py
-   ```
+1. Create a new Space (Gradio SDK, Python).
+2. Upload `app.py`, `requirements.txt`.
+3. In Settings → Secrets, add `OPENAI_API_KEY`.
+4. The app will auto-launch at https://huggingface.co/spaces/<username>/<space-name>.
