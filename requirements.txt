@@ -15,3 +15,4 @@ pipeline
 torch
 huggingface_hub
 pandas
+openai.embeddings_utils
